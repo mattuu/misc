@@ -81,17 +81,63 @@ public class Runner
 		var xmlDocument = new XmlDocument();
 		xmlDocument.LoadXml(xml);
 
+//
+//		XmlNode root = xmlDocument.DocumentElement;
+//		var node = root.SelectSingleNode("//InfoItem[contains(InfoName, 'Floor')]/InfoName", new XmlNamespaceManager(xmlDocument.NameTable));
+//
+//node.Dump();
 
-		XmlNode root = xmlDocument.DocumentElement;
-		var node = root.SelectSingleNode("//InfoItem/InfoName[contains(., 'Floor')]/../InfoName[text()]", new XmlNamespaceManager(xmlDocument.NameTable));
+		var m = new RegExMappingExpression<AreaModel, string>(_ => _.Location, "//InfoItem[contains(InfoName, 'Floor')]/InfoName", "\\w+");
+		
+		var model = new AreaModel();
+		
+		m.Map(xmlDocument, ref model);
+		
+		model.Dump();
 
-		node.Dump();
 
 //		var mapper = new PropertyModeMapper();
 //		
 //		var model = mapper.Map(xmlDocument);
 //		
 //		model.Dump();
+	}
+}
+
+public class RegExMappingExpression<TModel, TPropertyType> : IMappingExpression<TModel>
+{
+	string _xPath;
+	string _regex;
+	Expression<Func<TModel, TPropertyType>> _expressionFunc;
+	Func<string, TPropertyType> _propertyConverterFunc;
+
+	public RegExMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, string xPath, string regex, Func<string, TPropertyType> propertyConverterFunc = null)
+	{
+		_regex = regex;
+		_xPath = xPath;
+		_expressionFunc = expressionFunc;
+		_propertyConverterFunc = propertyConverterFunc;
+	}
+
+	public void Map(XmlDocument xmlDocument, ref TModel model)
+	{
+		XmlNode root = xmlDocument.DocumentElement;
+		var node = root.SelectSingleNode(_xPath, new XmlNamespaceManager(xmlDocument.NameTable));
+
+		if (node == null || string.IsNullOrEmpty(node.Value))
+		{
+			return;
+		}
+		var matchedValue = node.Value;
+//		var matchedValue = Regex.Match(node.Value, _regex);
+
+		object value = matchedValue;
+		if (_propertyConverterFunc != null)
+		{
+			value = _propertyConverterFunc.Invoke(node.Value);
+		}
+		
+		PropertySetter.GetSetter(_expressionFunc).Invoke(model, (TPropertyType)value);
 	}
 }
 
@@ -266,4 +312,3 @@ public static class PropertySetter
 		return newExpression.Compile();
 	}
 }
-
