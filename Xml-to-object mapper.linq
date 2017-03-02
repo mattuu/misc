@@ -83,7 +83,7 @@ public class Runner
 
 
 		XmlNode root = xmlDocument.DocumentElement;
-		var node = root.SelectSingleNode("//InfoItem[InfoName[contains(text(), 'Floor')]]/InfoName", new XmlNamespaceManager(xmlDocument.NameTable));
+		var node = root.SelectSingleNode("//InfoItem[InfoName[contains(text(), 'Floor')]]/InfoNamecd mi", new XmlNamespaceManager(xmlDocument.NameTable));
 
 		node.Dump();
 
