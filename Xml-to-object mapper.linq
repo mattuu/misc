@@ -78,42 +78,40 @@ public class Runner
 {
 	public void Run(string xml)
 	{
+		
 		var xmlDocument = new XmlDocument();
 		xmlDocument.LoadXml(xml);
 
-//
-//		XmlNode root = xmlDocument.DocumentElement;
-//		var node = root.SelectSingleNode("//InfoItem[contains(InfoName, 'Floor')]/InfoName", new XmlNamespaceManager(xmlDocument.NameTable));
-//
-//node.Dump();
 
-		var m = new RegExMappingExpression<AreaModel, string>(_ => _.Location, "//InfoItem[contains(InfoName, 'Floor')]/InfoName", "\\w+");
-		
-		var model = new AreaModel();
-		
-		m.Map(xmlDocument, ref model);
-		
+		var mapper = new PropertyModeMapper();
+		var model = mapper.Map(xmlDocument);
 		model.Dump();
+	}
+}
 
-
-//		var mapper = new PropertyModeMapper();
-//		
-//		var model = mapper.Map(xmlDocument);
-//		
-//		model.Dump();
+public class AreaModelMapper : ModelMapperBase<AreaModel>
+{
+	public AreaModelMapper()
+	{
+		_mappingExpressions = new Collection<IMappingExpression<AreaModel>>
+		{
+			new RegExMappingExpression<AreaModel, string>(m => m.Name, "//InfoItem[contains(InfoName, 'Floor')]/InfoName/text()", "[a-zA-z1-9 ]* - "),
+			new RegExMappingExpression<AreaModel, string>(m => m.Location, "//InfoItem[contains(InfoName, 'Floor')]/InfoName/text()", " - [a-zA-z1-9 ]*"),
+			new RegExMappingExpression<AreaModel, string>(m => m.Type,"//InfoItem[contains(InfoName, 'Floor')]/InfoName/text()", "[a-zA-z1-9 ]* - | [1-9]", s => s.ToLower()),
+		};
 	}
 }
 
 public class RegExMappingExpression<TModel, TPropertyType> : IMappingExpression<TModel>
 {
 	string _xPath;
-	string _regex;
+	string _pattern;
 	Expression<Func<TModel, TPropertyType>> _expressionFunc;
 	Func<string, TPropertyType> _propertyConverterFunc;
 
-	public RegExMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, string xPath, string regex, Func<string, TPropertyType> propertyConverterFunc = null)
+	public RegExMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, string xPath, string replacementPattern, Func<string, TPropertyType> propertyConverterFunc = null)
 	{
-		_regex = regex;
+		_pattern = replacementPattern;
 		_xPath = xPath;
 		_expressionFunc = expressionFunc;
 		_propertyConverterFunc = propertyConverterFunc;
@@ -128,15 +126,18 @@ public class RegExMappingExpression<TModel, TPropertyType> : IMappingExpression<
 		{
 			return;
 		}
-		var matchedValue = node.Value;
-//		var matchedValue = Regex.Match(node.Value, _regex);
+		
+		Console.WriteLine(node.Value);
+		
+		var matchedValue = Regex.Replace(node.Value, _pattern, "");
 
 		object value = matchedValue;
 		if (_propertyConverterFunc != null)
 		{
-			value = _propertyConverterFunc.Invoke(node.Value);
+			value = _propertyConverterFunc.Invoke(matchedValue);
 		}
-		
+		Console.WriteLine(node.Value + " -> " + value);
+
 		PropertySetter.GetSetter(_expressionFunc).Invoke(model, (TPropertyType)value);
 	}
 }
@@ -149,9 +150,7 @@ public class GeneralModelMapper : ModelMapperBase<GeneralModel>
 		_mappingExpressions = new Collection<IMappingExpression<GeneralModel>>
 		{
 			new XPathMappingExpression<GeneralModel, string>(m => m.CheckIn, "//InfoItem[InfoName/text() = 'Check In Time']/InfoValue/text()"),
-			new XPathMappingExpression<GeneralModel, string>(m => m.CheckOut, "//InfoItem[InfoName/text() = 'Check Out Time']/InfoValue/text()"),
-			//			new MappingExpression<Model, decimal?>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.PoolDepth, str => string.IsNullOrEmpty(str) ? default(decimal?) : decimal.Parse(str) )									   
-//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.CheckOut),
+			new XPathMappingExpression<GeneralModel, string>(m => m.CheckOut, "//InfoItem[InfoName/text() = 'Check Out Time']/InfoValue/text()")
 		};
 	}	
 }
@@ -164,24 +163,6 @@ public class PropertyModeMapper : ModelMapperBase<PropertyModel>
 		{
 			new ChildMappingExpression<PropertyModel, AreaModel>(m => m.Area, new AreaModelMapper()),
             new ChildMappingExpression<PropertyModel, GeneralModel>(m => m.General, new GeneralModelMapper())
-			//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Check In Time']/InfoValue/text()", m => m.CheckIn),
-//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Check Out Time']/InfoValue/text()", m => m.CheckOut),
-			//			new MappingExpression<Model, decimal?>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.PoolDepth, str => string.IsNullOrEmpty(str) ? default(decimal?) : decimal.Parse(str) )									   
-			//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.CheckOut),
-		};
-	}
-}
-
-public class AreaModelMapper : ModelMapperBase<AreaModel>
-{
-	public AreaModelMapper()
-	{
-		_mappingExpressions = new Collection<IMappingExpression<AreaModel>>
-		{
-//			new XPathMappingExpression<AreaModel, string>(m => m.Name, "//InfoItem[InfoName/contains('Ground Floor')]/InfoValue/text()"),
-			new XPathMappingExpression<AreaModel, string>(m => m.Type,"//InfoItem[InfoName/text() = 'Ground Floor']/InfoValue/text()"),
-			//			new MappingExpression<Model, decimal?>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.PoolDepth, str => string.IsNullOrEmpty(str) ? default(decimal?) : decimal.Parse(str) )									   
-			//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.CheckOut),
 		};
 	}
 }
@@ -275,10 +256,6 @@ public class GeneralModel
 
 public class PropertyModel
 {
-//	public int PropertyId { get; set; }
-//	
-//	public string PropertyName { get; set; }
-	
 	public GeneralModel General { get; set;}
 
 	public AreaModel Area { get; set;}
@@ -290,8 +267,6 @@ public class AreaModel
 	public string Name { get; set; }
 
 	public string Type { get; set; }
-
-//	public IEnumerable<int> FacilityIds { get; set; }
 
 	public string Location { get; set; }
 }
