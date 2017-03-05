@@ -78,69 +78,88 @@ public class Runner
 {
 	public void Run(string xml)
 	{
-		
 		var xmlDocument = new XmlDocument();
 		xmlDocument.LoadXml(xml);
 
+//
+//		XmlNode root = xmlDocument.DocumentElement;
+//		var node = root.SelectSingleNode("//InfoItem[contains(InfoName, 'Floor')]/InfoName", new XmlNamespaceManager(xmlDocument.NameTable));
+//
+//node.Dump();
 
-		var mapper = new PropertyModeMapper();
+//		var m = new RegExMappingExpression<AreaModel, string>(_ => _.Location, "//InfoItem[contains(InfoName, 'Floor')]/InfoName", "\\w+");
+		
+		var mapper = new AreaModelMapper();
+		
 		var model = mapper.Map(xmlDocument);
+		
 		model.Dump();
+
+
+//		var mapper = new PropertyModeMapper();
+//		
+//		var model = mapper.Map(xmlDocument);
+//		
+//		model.Dump();
 	}
 }
 
-public class AreaModelMapper : ModelMapperBase<AreaModel>
+
+public interface INodeValueProcessor<TPropertyType>
 {
-	public AreaModelMapper()
+	TPropertyType Process(string nodeValue);
+}
+
+public class FacilityIdsNodeValueProcessor : INodeValueProcessor<IEnumerable<int>>
+{	
+	FacilityProvider _facilityProvider;
+
+	public FacilityIdsNodeValueProcessor(FacilityProvider facilityProvider)
 	{
-		_mappingExpressions = new Collection<IMappingExpression<AreaModel>>
-		{
-			new RegExMappingExpression<AreaModel, string>(m => m.Name, "//InfoItem[contains(InfoName, 'Floor')]/InfoName/text()", "[a-zA-z1-9 ]* - "),
-			new RegExMappingExpression<AreaModel, string>(m => m.Location, "//InfoItem[contains(InfoName, 'Floor')]/InfoName/text()", " - [a-zA-z1-9 ]*"),
-			new RegExMappingExpression<AreaModel, string>(m => m.Type,"//InfoItem[contains(InfoName, 'Floor')]/InfoName/text()", "[a-zA-z1-9 ]* - | [1-9]", s => s.ToLower()),
-		};
+		_facilityProvider = facilityProvider;
+	}
+	
+	public IEnumerable<int> Process(string nodeValue)
+	{
+		var facilities = nodeValue.Split(',');
+
+		return facilities.Select(f => f.Trim())
+			.Select(f => _facilityProvider.GetFacility(f))
+			.ToArray();
+		
+//		return new int[] { 1, 2, 3, 4};
+//		throw new NotImplementedException();
 	}
 }
 
-public class RegExMappingExpression<TModel, TPropertyType> : IMappingExpression<TModel>
+public class FacilityProvider
 {
-	string _xPath;
-	string _pattern;
-	Expression<Func<TModel, TPropertyType>> _expressionFunc;
-	Func<string, TPropertyType> _propertyConverterFunc;
-
-	public RegExMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, string xPath, string replacementPattern, Func<string, TPropertyType> propertyConverterFunc = null)
+	IDictionary<int, string> _facilities;
+	
+	public FacilityProvider()
 	{
-		_pattern = replacementPattern;
-		_xPath = xPath;
-		_expressionFunc = expressionFunc;
-		_propertyConverterFunc = propertyConverterFunc;
+		_facilities = new Dictionary<int, string>();
+		_facilities.Add(1, "Air Conditioning");
+		_facilities.Add(2, "Balcony");
+		_facilities.Add(3, "Oven");
+		_facilities.Add(4, "Microwave");
+		_facilities.Add(5, "Dishwasher");
+		_facilities.Add(6, "Fridge Freezer");		
+		_facilities.Add(7, "Flat Screen TV");
+		_facilities.Add(8, "DVD Player");
+		_facilities.Add(9, "Music Player");
+		_facilities.Add(10, "Air Conditioning");
+		_facilities.Add(11, "Comfortable Seating");
+		_facilities.Add(13, "Doors to Terrace Gardens");
 	}
 
-	public void Map(XmlDocument xmlDocument, ref TModel model)
+	public int GetFacility(string facilityName)
 	{
-		XmlNode root = xmlDocument.DocumentElement;
-		var node = root.SelectSingleNode(_xPath, new XmlNamespaceManager(xmlDocument.NameTable));
-
-		if (node == null || string.IsNullOrEmpty(node.Value))
-		{
-			return;
-		}
-		
-		Console.WriteLine(node.Value);
-		
-		var matchedValue = Regex.Replace(node.Value, _pattern, "");
-
-		object value = matchedValue;
-		if (_propertyConverterFunc != null)
-		{
-			value = _propertyConverterFunc.Invoke(matchedValue);
-		}
-		Console.WriteLine(node.Value + " -> " + value);
-
-		PropertySetter.GetSetter(_expressionFunc).Invoke(model, (TPropertyType)value);
+		Console.WriteLine(facilityName);
+		return _facilities.SingleOrDefault(x => x.Value == facilityName).Key;
 	}
 }
+
 
 public class GeneralModelMapper : ModelMapperBase<GeneralModel>
 {
@@ -150,7 +169,9 @@ public class GeneralModelMapper : ModelMapperBase<GeneralModel>
 		_mappingExpressions = new Collection<IMappingExpression<GeneralModel>>
 		{
 			new XPathMappingExpression<GeneralModel, string>(m => m.CheckIn, "//InfoItem[InfoName/text() = 'Check In Time']/InfoValue/text()"),
-			new XPathMappingExpression<GeneralModel, string>(m => m.CheckOut, "//InfoItem[InfoName/text() = 'Check Out Time']/InfoValue/text()")
+			new XPathMappingExpression<GeneralModel, string>(m => m.CheckOut, "//InfoItem[InfoName/text() = 'Check Out Time']/InfoValue/text()"),
+			//			new MappingExpression<Model, decimal?>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.PoolDepth, str => string.IsNullOrEmpty(str) ? default(decimal?) : decimal.Parse(str) )									   
+//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.CheckOut),
 		};
 	}	
 }
@@ -161,8 +182,27 @@ public class PropertyModeMapper : ModelMapperBase<PropertyModel>
 	{
 		_mappingExpressions = new Collection<IMappingExpression<PropertyModel>>
 		{
-			new ChildMappingExpression<PropertyModel, AreaModel>(m => m.Area, new AreaModelMapper()),
-            new ChildMappingExpression<PropertyModel, GeneralModel>(m => m.General, new GeneralModelMapper())
+//			new ChildMappingExpression<PropertyModel, AreaModel>(m => m.Area, new AreaModelMapper()),
+//            new ChildMappingExpression<PropertyModel, GeneralModel>(m => m.General, new GeneralModelMapper())
+			//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Check In Time']/InfoValue/text()", m => m.CheckIn),
+//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Check Out Time']/InfoValue/text()", m => m.CheckOut),
+			//			new MappingExpression<Model, decimal?>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.PoolDepth, str => string.IsNullOrEmpty(str) ? default(decimal?) : decimal.Parse(str) )									   
+			//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.CheckOut),
+		};
+	}
+}
+
+public class AreaModelMapper : ModelMapperBase<AreaModel>
+{
+	public AreaModelMapper()
+	{
+		_mappingExpressions = new Collection<IMappingExpression<AreaModel>>
+		{
+			//			new XPathMappingExpression<AreaModel, string>(m => m.Name, "//InfoItem[InfoName/contains('Ground Floor')]/InfoValue/text()"),
+			new XPathMappingExpression<AreaModel, string>(m => m.Type,"//InfoItem[contains(InfoName, 'Ground Floor')]/InfoName/text()"),
+			new XPathMappingExpression<AreaModel, IEnumerable<int>>(m => m.FacilityIds,"//InfoItem[contains(InfoName, 'Ground Floor')]/InfoValue/text()", new FacilityIdsNodeValueProcessor(new FacilityProvider())),
+			//			new MappingExpression<Model, decimal?>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.PoolDepth, str => string.IsNullOrEmpty(str) ? default(decimal?) : decimal.Parse(str) )									   
+			//			new MappingExpression<GeneralModel, string>("//InfoItem[InfoName/text() = 'Pool Size']/InfoValue/text()", m => m.CheckOut),
 		};
 	}
 }
@@ -196,36 +236,19 @@ public interface IMappingExpression<T>
 	void Map(XmlDocument xmlDocument, ref T model);
 }
 
-public class ChildMappingExpression<TModel, TPropertyType> : IMappingExpression<TModel>
-	where TPropertyType: new()
-{
-	Expression<Func<TModel, TPropertyType>> _expressionFunc;
-	ModelMapperBase<TPropertyType> _propertyMapperFunc;
-	
-	public ChildMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, ModelMapperBase<TPropertyType> propertyMapperFunc)
-	{
-		_expressionFunc = expressionFunc;
-		_propertyMapperFunc = propertyMapperFunc;
-	}
-	
-	public void Map(XmlDocument xmlDocument, ref TModel model)
-	{
-		PropertySetter.GetSetter(_expressionFunc).Invoke(model, _propertyMapperFunc.Map(xmlDocument));
-	}
-}
 
 public class XPathMappingExpression<TModel, TPropertyType> : IMappingExpression<TModel>
 //	where TModel: GeneralModel
 {
 	string _xPath;
 	Expression<Func<TModel, TPropertyType>> _expressionFunc; 
-	Func<string, TPropertyType> _propertyConverterFunc;
+	INodeValueProcessor<TPropertyType> _nodeValueProcessor;
 	
-	public XPathMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, string xPath, Func<string, TPropertyType> propertyConverterFunc = null)
+	public XPathMappingExpression(Expression<Func<TModel, TPropertyType>> expressionFunc, string xPath, INodeValueProcessor<TPropertyType> nodeValueProcessor = null)
 	{
 		_xPath = xPath;
 		_expressionFunc = expressionFunc;
-		_propertyConverterFunc = propertyConverterFunc;
+		_nodeValueProcessor = nodeValueProcessor;
 	}
 
 	public void Map(XmlDocument xmlDocument, ref TModel model)
@@ -239,9 +262,9 @@ public class XPathMappingExpression<TModel, TPropertyType> : IMappingExpression<
 		}
 
 		object value = node.Value;
-		if (_propertyConverterFunc != null)
+		if (_nodeValueProcessor != null)
 		{
-			value = _propertyConverterFunc.Invoke(node.Value);
+			value = _nodeValueProcessor.Process(node.Value);
 		}
 		PropertySetter.GetSetter(_expressionFunc).Invoke(model, (TPropertyType) value);
 	}
@@ -256,6 +279,10 @@ public class GeneralModel
 
 public class PropertyModel
 {
+//	public int PropertyId { get; set; }
+//	
+//	public string PropertyName { get; set; }
+	
 	public GeneralModel General { get; set;}
 
 	public AreaModel Area { get; set;}
@@ -267,6 +294,8 @@ public class AreaModel
 	public string Name { get; set; }
 
 	public string Type { get; set; }
+
+	public IEnumerable<int> FacilityIds { get; set; }
 
 	public string Location { get; set; }
 }
