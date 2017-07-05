@@ -30,15 +30,18 @@
   <Namespace>AutoMapper.XpressionMapper.Structures</Namespace>
   <Namespace>Ploeh.AutoFixture</Namespace>
   <Namespace>Microsoft.Practices.Unity</Namespace>
+  <Namespace>Ploeh.AutoFixture.Kernel</Namespace>
 </Query>
 
 void Main()
 {
 	var fixture = new Fixture();
 	fixture.Register<IStringProvider>(() => new StringProvider());
-	
+
 	var container = new UnityContainer();
 	container.RegisterType<IStringProvider, StringProvider>();
+
+	Func<Type, object> serviceCtor = t => fixture.Create(t, new SpecimenContext(fixture));
 
 	var config = new MapperConfiguration(cfg =>
 			   {
@@ -48,14 +51,13 @@ void Main()
 
 				   cfg.Advanced.AllowAdditiveTypeMapCreation = true;
 
-//				   cfg.ConstructServicesUsing(t => fixture.Create(t));
-				   cfg.ConstructServicesUsing(t => container.Resolve(t));
+				   cfg.ConstructServicesUsing(serviceCtor);
 			   });
-			   
+
 	IMapper mapper = new Mapper(config);
-	
+
 	var result = mapper.Map<string>(new Random().Next());
-	
+
 	result.Dump();
 }
 
@@ -71,12 +73,12 @@ public class IntToStringProfile : Profile
 public class IntToStringValueConverter : ITypeConverter<int, string>
 {
 	IStringProvider _stringProvider;
-	
+
 	public IntToStringValueConverter(IStringProvider stringProvider)
 	{
 		_stringProvider = stringProvider;
 	}
-	
+
 	public string Convert(int source, string destination, ResolutionContext context)
 	{
 		return _stringProvider.GetString(source);
@@ -94,4 +96,13 @@ public class StringProvider : IStringProvider
 public interface IStringProvider
 {
 	string GetString(int source);
+}
+
+public static class FixtureExtensions
+{
+	public static object CreateUsingType(this IFixture fixture, Type type)
+	{
+		return fixture.Create(type, new SpecimenContext(fixture));
+	}
+
 }
