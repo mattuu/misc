@@ -100,27 +100,30 @@ public class ContentBlocker : IContentBlocker
 			if (!hidings.Any())
 				continue;
 
+			var list = propertyInfo.GetValue(overridable) as IList;
+
 			foreach (var hiding in hidings)
 			{
 				// copy propertyInfo.GetValue() into IList
-				var list = propertyInfo.GetValue(overridable) as IList;
 
 				// find item to remove..
 				var pi = collectionElementType.GetProperty(hiding.Configuration.ColumnName);
 				object itemToDelete = null;
 				foreach (var item in list)
 				{
-					if (pi.GetValue(item).ToString() == hiding.Configuration.DataKey)
+					if (string.IsNullOrEmpty(hiding.Configuration.DataKey) || pi.GetValue(item).ToString() == hiding.Configuration.DataKey)
 					{
-						itemToDelete = item;
+//						item.Dump();
+						list.Remove(item);
+//						itemToDelete = item;
 					}
 				}
 
-				// remove item from list
-				if (itemToDelete != null)
-				{
-					list.Remove(itemToDelete);
-				}
+//				// remove item from list
+//				if (itemToDelete != null)
+//				{
+//					
+//				}
 
 				// shift list back into propertyValue
 				propertyInfo.SetValue(overridable, list);
