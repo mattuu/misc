@@ -14,27 +14,32 @@ void Main()
 {
 	var fixture = new Fixture();
 	
-	var overridable = fixture.Build<TestOverridable>()
-									.With(e => e.Overrides, fixture.Build<Override>()
-																   .With(o => o.IsResolved, false)
-																   .With(o => o.OverrideType, OverrideType.Hiding)
-																   .With(o => o.Configuration, fixture.Build<Configuration>()
-																									  .With(c => c.CanHide, true)
-																									  .With(c => c.ColumnName, "Property1")
-																									  .With(c => c.TableName, "TestOverridable")
-																									  .Create())
-																   .CreateMany(1)
-																   .ToList())
-									.Create();
+	 var overridable = fixture.Build<TestOverridable>()
+                                     .With(e => e.Children, fixture.Build<TestChild>()
+                                                                   .With(c => c.Property1, "Child1")
+                                                                   .CreateMany(1)
+                                                                   .ToList())
+                                     .With(e => e.Overrides, fixture.Build<Override>()
+                                                                    .With(o => o.IsResolved, false)
+																	.With(o => o.OverrideType, OverrideType.Hiding)
+																	.With(o => o.Configuration, fixture.Build<Configuration>()
+																									   .With(c => c.CanHide, true)
+																									   .With(c => c.TableName, "TestChild")
+																									   .With(c => c.ColumnName, "Property1")
+																									   .With(c => c.DataKey, "Child1")
+																									   .Create())
+																	.CreateMany(1)
+																	.ToList())
+									 .Create();
 
 	var sut = new ContentBlocker();
 	
 	var actual = sut.RemoveBlockedContent(overridable);
 
 	// assert..
-	actual.Property1.ShouldBeNull();
-	
-	
+	actual.Children.Dump(nameof(actual.Children));
+
+
 }
 
 public class ContentBlocker : IContentBlocker
