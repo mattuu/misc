@@ -12,6 +12,28 @@
 
 void Main()
 {
+	var fixture = new Fixture();
+	
+	var overridable = fixture.Build<TestOverridable>()
+									.With(e => e.Overrides, fixture.Build<Override>()
+																   .With(o => o.IsResolved, false)
+																   .With(o => o.OverrideType, OverrideType.Hiding)
+																   .With(o => o.Configuration, fixture.Build<Configuration>()
+																									  .With(c => c.CanHide, true)
+																									  .With(c => c.ColumnName, "Property1")
+																									  .With(c => c.TableName, "TestOverridable")
+																									  .Create())
+																   .CreateMany(1)
+																   .ToList())
+									.Create();
+
+	var sut = new ContentBlocker();
+	
+	var actual = sut.RemoveBlockedContent(overridable);
+
+	// assert..
+	actual.Property1.ShouldBeNull();
+	
 	
 }
 
@@ -120,6 +142,29 @@ public interface IContentBlocker
 public interface IOverridable
 {
 	ICollection<Override> Overrides { get; set; }
+}
+
+public class TestOverridable : IOverridable
+{
+	public string Property1 { get; set; }
+
+	public IEnumerable<TestChild> Children { get; set; }
+
+	public ICollection<Override> Overrides { get; set; }
+}
+
+public class TestChild : IOverridable
+{
+	public string Property1 { get; set; }
+
+	public IEnumerable<TestGrandChild> GrandChildren { get; set; }
+
+	public ICollection<Override> Overrides { get; set; }
+}
+
+public class TestGrandChild
+{
+	public string Property1 { get; set; }
 }
 
 public class Override
