@@ -1,12 +1,4 @@
 <Query Kind="Program">
-  <Connection>
-    <ID>001a2c40-489f-49b1-bffd-f43fa1b096d1</ID>
-    <Persist>true</Persist>
-    <Driver>EntityFrameworkDbContext</Driver>
-    <CustomAssemblyPath>C:\GitSrc\J2BI.Holidays.PCPS\src\J2BI.Holidays.PCPS.DataAccess\bin\Debug\J2BI.Holidays.PCPS.DataAccess.dll</CustomAssemblyPath>
-    <CustomTypeName>J2BI.Holidays.PCPS.DataAccess.DataContext</CustomTypeName>
-    <AppConfigPath>C:\GitSrc\J2BI.Holidays.PCPS\src\J2BI.Holidays.PCPS.Content.Api\Web.config</AppConfigPath>
-  </Connection>
   <Output>DataGrids</Output>
   <Reference>&lt;RuntimeDirectory&gt;\System.Data.Entity.dll</Reference>
   <Reference>&lt;RuntimeDirectory&gt;\System.Linq.dll</Reference>
@@ -32,18 +24,21 @@ void Main()
 {
 	var data = new Builder().CreateListOfSize<Property>(1000)
 		.All()
-		.Do(p => p.Name = new RandomGenerator().NextString(0, 100))
+		.Do(p => p.Name = new RandomGenerator().NextString(0, 100).Trim())
 	.Build();
-	
-	AddOrUpdateIndex(new StandardAnalyzer(Lucene.Net.Util.Version.LUCENE_30), data.ToArray());
 
-//		Search(new MatchAllDocsQuery()).Dump();
+	using (var analyzer = new SimpleAnalyzer())
+	{
+		AddOrUpdateIndex(analyzer, data.ToArray());
 
 
-var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", new StandardAnalyzer(Lucene.Net.Util.Version.LUCENE_30)).Parse("lorem*");
 
-	Search(query).Dump(nameof(QueryParser));
+		//		var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", analyzer).Parse("et");
+		var query = new WildcardQuery(new Term("Name", "lorem ipsum*"));
 
+		Search(query).Dump(nameof(QueryParser));
+		Search(new MatchAllDocsQuery()).Dump(nameof(MatchAllDocsQuery));
+	}
 	//	Search(new MatchAllDocsQuery()).Dump(nameof(MatchAllDocsQuery));
 }
 
@@ -55,12 +50,12 @@ IEnumerable Search(Query query)
 		//		query = new WildcardQuery(new Term("Name", "Nic*"));
 		//
 
-		var hits = searcher.Search(query, 30).ScoreDocs;
-//
+		var hits = searcher.Search(query, int.MaxValue).ScoreDocs;
+		//
 		return hits.Select(h =>
 		{
 			var doc = searcher.Doc(h.Doc);
-			return doc.GetField("Name").StringValue;
+			return doc.GetField("Name")?.StringValue;
 
 		}).ToList();
 	}
@@ -111,13 +106,7 @@ public void AddOrUpdateIndex(Analyzer analyzer, params Property[] data)
 				doc.Add(new Field("OrlandoId", property.OrlandoId.ToString(), Field.Store.YES, Field.Index.NOT_ANALYZED));
 
 				if (!string.IsNullOrEmpty(property.Name))
-					doc.Add(new Field("Name", property.Name, Field.Store.YES, Field.Index.ANALYZED));
-
-				if (!string.IsNullOrEmpty(property.Gateway))
-					doc.Add(new Field("Gateway", property.Gateway, Field.Store.YES, Field.Index.ANALYZED));
-
-				if (!string.IsNullOrEmpty(property.Resort))
-					doc.Add(new Field("Resort", property.Resort, Field.Store.YES, Field.Index.ANALYZED));
+					doc.Add(new Field("Name", property.Name, Field.Store.YES, Field.Index.NOT_ANALYZED));
 
 				if (doc != null)
 					writer.AddDocument(doc);
@@ -136,4 +125,3 @@ public class Property
 
 	public string Resort { get; set; }
 }
-
