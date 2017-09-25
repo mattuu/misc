@@ -34,20 +34,15 @@ void Main()
 		.All()
 		.Do(p => p.Name = new RandomGenerator().NextString(0, 100))
 	.Build();
-	data.Dump();
-	AddOrUpdateIndex(new KeywordAnalyzer(), data.ToArray());
+	
+	AddOrUpdateIndex(new StandardAnalyzer(Lucene.Net.Util.Version.LUCENE_30), data.ToArray());
 
-	//	var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", new KeywordAnalyzer()).Parse(term);
-
-	//	var query = new WildcardQuery(new Term("Name", term));
-//	var query = new MatchAllDocsQuery();
-
-		Search(new MatchAllDocsQuery()).Dump();
+//		Search(new MatchAllDocsQuery()).Dump();
 
 
-var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", new KeywordAnalyzer()).Parse("dolor");
+var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", new StandardAnalyzer(Lucene.Net.Util.Version.LUCENE_30)).Parse("lorem*");
 
-	Search(query).Dump(nameof(WildcardQuery));
+	Search(query).Dump(nameof(QueryParser));
 
 	//	Search(new MatchAllDocsQuery()).Dump(nameof(MatchAllDocsQuery));
 }
@@ -59,15 +54,12 @@ IEnumerable Search(Query query)
 		//		Query query = new MatchAllDocsQuery();
 		//		query = new WildcardQuery(new Term("Name", "Nic*"));
 		//
-		//		var analyzer = new KeywordAnalyzer();
-		//		query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", analyzer).Parse(query.ToString());
 
-		var hits = searcher.Search(query, int.MaxValue).ScoreDocs;
-
+		var hits = searcher.Search(query, 30).ScoreDocs;
+//
 		return hits.Select(h =>
 		{
 			var doc = searcher.Doc(h.Doc);
-
 			return doc.GetField("Name").StringValue;
 
 		}).ToList();
