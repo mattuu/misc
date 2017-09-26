@@ -1,4 +1,12 @@
 <Query Kind="Program">
+  <Connection>
+    <ID>001a2c40-489f-49b1-bffd-f43fa1b096d1</ID>
+    <Persist>true</Persist>
+    <Driver>EntityFrameworkDbContext</Driver>
+    <CustomAssemblyPath>C:\GitSrc\J2BI.Holidays.PCPS\src\J2BI.Holidays.PCPS.DataAccess\bin\Debug\J2BI.Holidays.PCPS.DataAccess.dll</CustomAssemblyPath>
+    <CustomTypeName>J2BI.Holidays.PCPS.DataAccess.DataContext</CustomTypeName>
+    <AppConfigPath>C:\GitSrc\J2BI.Holidays.PCPS\src\J2BI.Holidays.PCPS.Content.Api\Web.config</AppConfigPath>
+  </Connection>
   <Output>DataGrids</Output>
   <Reference>&lt;RuntimeDirectory&gt;\System.Data.Entity.dll</Reference>
   <Reference>&lt;RuntimeDirectory&gt;\System.Linq.dll</Reference>
@@ -22,43 +30,58 @@
 
 void Main()
 {
-	var data = new Builder().CreateListOfSize<Property>(1000)
+	var data = new Builder().CreateListOfSize<Property>(100)
 		.All()
-		.Do(p => p.Name = new RandomGenerator().NextString(0, 100).Trim())
+		.Do(p => p.Name = new RandomGenerator().NextString(0, 100).ToUpper())
 	.Build();
 
-	using (var analyzer = new SimpleAnalyzer())
+	using (var analyzer = new StandardAnalyzer(Lucene.Net.Util.Version.LUCENE_30))
 	{
-		AddOrUpdateIndex(analyzer, data.ToArray());
+		//		AddOrUpdateIndex(analyzer, data.ToArray());
 
-
-
-		//		var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", analyzer).Parse("et");
-		var query = new WildcardQuery(new Term("Name", "lorem ipsum*"));
-
-		Search(query).Dump(nameof(QueryParser));
-		Search(new MatchAllDocsQuery()).Dump(nameof(MatchAllDocsQuery));
-	}
-	//	Search(new MatchAllDocsQuery()).Dump(nameof(MatchAllDocsQuery));
-}
-
-IEnumerable Search(Query query)
-{
-	using (var searcher = new IndexSearcher(Directory))
-	{
-		//		Query query = new MatchAllDocsQuery();
-		//		query = new WildcardQuery(new Term("Name", "Nic*"));
-		//
-
-		var hits = searcher.Search(query, int.MaxValue).ScoreDocs;
-		//
-		return hits.Select(h =>
+		using (var searcher = new IndexSearcher(FSDirectory.Open(new DirectoryInfo(@"C:\temp\Jet2PCPS\lucene_index"))))
 		{
-			var doc = searcher.Doc(h.Doc);
-			return doc.GetField("Name")?.StringValue;
+			var queryText= "Marum*";
+			var parser = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", analyzer);
+//			var query = parser.Parse(QueryParser.Escape(queryText));
 
-		}).ToList();
-	}
+			var query = new BooleanQuery();
+			foreach(var t in queryText.Split(' '))
+				query.Add(new WildcardQuery(new Term("Name", t.ToLower())), Occur.MUST);
+			
+			
+			Console.WriteLine(query.GetType().Name.ToString());
+			Console.WriteLine(query.ToString());
+			
+			var hits = searcher.Search(query, int.MaxValue).ScoreDocs;
+			//
+			hits.Select(h =>
+			{
+				var doc = searcher.Doc(h.Doc);
+				return new
+				{
+					Name = doc.GetField("Name")?.StringValue
+				};
+
+			}).ToList().Dump();
+		}
+
+		//		var query = new QueryParser(Lucene.Net.Util.Version.LUCENE_30, "Name", analyzer).Parse("\"tempor dolore\"");
+
+//		var query = new PhraseQuery();
+//		query.Add(new Term("Name", "tempor"));
+//		query.Add(new Term("Name", "ipsum*"));
+
+//		var query = new BooleanQuery();
+//		query.Add(new TermQuery(new Term("Name", "Tempor")), Occur.MUST);
+//		query.Add(new WildcardQuery(new Term("Name", "ipsum*")), Occur.MUST);
+		
+//		Console.WriteLine(query.ToString());
+//		Console.WriteLine(query.GetType().Name.ToString());
+//		Search(query).Dump(nameof(QueryParser));
+
+//		Search(new MatchAllDocsQuery()).Dump();
+	}	
 }
 
 
@@ -92,7 +115,7 @@ internal string LuceneDir => Path.Combine(@"C:\temp\experiment", "lucene_index")
 
 public void AddOrUpdateIndex(Analyzer analyzer, params Property[] data)
 {
-	using (analyzer)
+//	using (analyzer)
 	{
 		using (var writer = new IndexWriter(Directory, analyzer, IndexWriter.MaxFieldLength.UNLIMITED))
 		{
@@ -106,12 +129,38 @@ public void AddOrUpdateIndex(Analyzer analyzer, params Property[] data)
 				doc.Add(new Field("OrlandoId", property.OrlandoId.ToString(), Field.Store.YES, Field.Index.NOT_ANALYZED));
 
 				if (!string.IsNullOrEmpty(property.Name))
+				{
 					doc.Add(new Field("Name", property.Name, Field.Store.YES, Field.Index.NOT_ANALYZED));
-
+//					doc.Add(new Field("name", property.Name.ToLower(), Field.Store.NO, Field.Index.ANALYZED));
+				}
+				
 				if (doc != null)
 					writer.AddDocument(doc);
 			}
 		}
+	}
+}
+
+IEnumerable Search(Query query)
+{
+	using (var searcher = new IndexSearcher(Directory))
+	{
+		//		Query query = new MatchAllDocsQuery();
+		//		query = new WildcardQuery(new Term("Name", "Nic*"));
+		//
+
+		var hits = searcher.Search(query, int.MaxValue).ScoreDocs;
+		//
+		return hits.Select(h =>
+		{
+			var doc = searcher.Doc(h.Doc);
+			return new
+			{
+				Name = doc.GetField("Name")?.StringValue,
+				name = doc.GetField("name")?.StringValue,
+			};
+
+		}).ToList();
 	}
 }
 
