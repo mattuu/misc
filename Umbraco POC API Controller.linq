@@ -48,7 +48,7 @@
     <Content>
       <configuration>
         <connectionStrings>
-          <add name="umbracoDbDSN" connectionString="Server=tcp:cmgx.database.windows.net,1433;Initial Catalog=Umbraco-Playground;Persist Security Info=False;User ID=matt;Password=Kom3984!;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;" providerName="System.Data.SqlClient" />
+          <add name="umbracoDbDSN" connectionString="Server=tcp:cmgx.database.windows.net,1433;Initial Catalog=Umbraco-Playground;Persist Security Info=False;User ID=xxx;Password=xxx;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;" providerName="System.Data.SqlClient" />
         </connectionStrings>
       </configuration>
     </Content>
@@ -59,7 +59,7 @@ void Main()
 {
 	var ctx = new DataContext();
 	
-	var q = ctx.Database.SqlQuery<object>("SELECT * FROM sys.tables");
+	var q = ctx.Database.SqlQuery<object>("SELECT * FROM sys.tables")
 	q.Dump();
 }
 
